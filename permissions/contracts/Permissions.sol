@@ -2,22 +2,42 @@ pragma solidity ^0.4.23;
 
 contract Permissions {
 
-  enum NodeStatus { NotInList, PendingApproval, Approved, PendingDeactivation, Deactivated, PendingBlacklisting, Blacklisted}
-
-  enum AccountAccess {FullAccess, ReadOnly, Transact, ContractDeploy}
-
+  // enum and struct declaration
+  enum NodeStatus { PendingApproval, Approved, PendingDeactivation, Deactivated, PendingBlacklisting, Blacklisted }
+  enum AccountAccess { ReadOnly, Admin, Transact, ContractDeploy }
   struct nodeDetails {
-    string enodeId;
-    //e.g. 127.0.0.1:20005
+    string enodeId; //e.g. 127.0.0.1:20005
     string ipAddrPort;
     string discPort;
     string raftPort;
-    bool canWrite;
+    bool canWrite; // this is strange, I think we should control the write permission at account level
     bool canLead;
     NodeStatus status;
   }
-  mapping (bytes32 => nodeDetails) nodeList;
-  uint numberOfNodes;
+  struct accountDetails {
+    address accountAddress
+    AccountAccess accountAccess;
+  }
+
+  // use an array to store node details
+  // if we want to list all node one day, mapping is not capable
+  nodeDetails[] public nodeList;
+  // use a mapping of enodeid to array index to track the node
+  mapping (bytes32 => uint) public nodeIdList
+  // keep track of node number
+  uint public numberOfNodes;
+
+  // use an array to store account details
+  // if we want to list all account one day, mapping is not capable
+  accountDetails[] public nodeList;
+  // use a mapping of enodeid to array index to track the node
+  mapping (bytes32 => uint) public nodeIdList
+  // keep track of account number and votting account number
+  uint public numberOfAccounts;
+  uint public numberOfVottingAccounts;
+
+  // store node approval, deactivation and blacklisting voting status
+  mapping (uint => mapping (address => bool)) public votingStatus
 
   struct acctAccess {
     address acctId;
@@ -25,13 +45,20 @@ contract Permissions {
   }
   mapping (address => acctAccess) acctAccessList;
 
-  event NewNodeProposed (string _enodeId);
+  // node permission events
+  event NewNodeProposed(string _enodeId);
+  event VoteNodeApproval(string _enodeId, address _accountAddress);
   event NodeApproved(string _enodeId, string _ipAddrPort, string _discPort, string _raftPort);
   event NodePendingDeactivation (string _enodeId);
+  event VoteNodeDeactivation(string _enodeId, address _accountAddress);
   event NodeDeactivated(string _enodeId, string _ipAddrPort, string _discPort, string _raftPort);
-  event AcctAccessModified (address acctId, AccountAccess access);
   event NodePendingBlacklisting(string _enodeId);
+  event VoteNodeBlacklisting(string _enodeId, address _accountAddress);
   event NodeBlacklisted(string _enodeId, string _ipAddrPort, string _discPort, string _raftPort);
+  // account permission events
+  event AcctAccessModified (address _accountAddress, AccountAccess _AccountAccess);
+
+  /* public functions */
 
   // Checks if the Node is already added. If yes then returns true
   function getNodeStatus (string _enodeId) public view returns (NodeStatus _status) {
@@ -96,5 +123,7 @@ contract Permissions {
     acctAccessList[_acctId] = acctAccess(_acctId, access);
     emit AcctAccessModified(_acctId, access);
   }
+
+  /* private functions */
 
 }
