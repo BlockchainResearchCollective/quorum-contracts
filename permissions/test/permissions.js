@@ -1,56 +1,82 @@
 var Permissions = artifacts.require("./Permissions.sol");
 
-// var perm;
-// var foundEvent = "NO";
-// var eventName = "";
-// var nodeId = 0;
-//
-contract('Permissions', function(accounts) {
-  it("should output a default 0", function() {
-    return Permissions.deployed().then(function(instance) {
-      return instance.numberOfNodes.call();
-    }).then(function(result) {
-      assert.equal(result, 0, "not 0");
-    });
-  });
-});
-//
-// assert.equal(response.logs[index].event, eventName, eventName + ' event should fire.')
+function assertEventOfType(receipt, eventName, index) {
+    assert.equal(receipt.logs[index].event, eventName, eventName + ' event should fire.')
+}
 
-//
-// function printEvent (result){
-// 	for (var i = 0; i < result.logs.length; i++) {
-//                 var log = result.logs[i];
-// //              console.log(log);
-//                 eventName = log.event;
-//                 foundEvent = "YES";
-//                 nodeId = log.args._nodeId;
-//         }
-//         if (foundEvent == "YES"){
-//                 console.log("Yes. detected the event!!!!!" + eventName + "---" + nodeId);
-//         } else {
-//                 console.log("No.Did not find the event !!!!!!");
-//
-//         }
-// }
-// 	perm.ProposeNode("nnhb1096ca56b9f6d004b779ae3728bf83f8e22453404cc3cef16a3d9b96608bc67c4b30db88e0a5a6c6390213f7acbe1153ff6d23ce57380104288ae19373ef", "true", "true") .then (function(result) {
-// 	printEvent(result);
-// });
-//	perm.ProposeNode("dc6b1096ca56b9f6d004b779ae3728bf83f8e22453404cc3cef16a3d9b96608bc67c4b30db88e0a5a6c6390213f7acbe1153ff6d23ce57380104288ae19373ef","true", "true") .then (function(result) {
-//	printEvent(result);
-//});
-//	perm.ApproveNode("ac6b1096ca56b9f6d004b779ae3728bf83f8e22453404cc3cef16a3d9b96608bc67c4b30db88e0a5a6c6390213f7acbe1153ff6d23ce57380104288ae19373ef").then(function(result){
-//	printEvent(result);
-//})
-//	perm.ApproveNode("dc6b1096ca56b9f6d004b779ae3728bf83f8e22453404cc3cef16a3d9b96608bc67c4b30db88e0a5a6c6390213f7acbe1153ff6d23ce57380104288ae19373ef") .then (function(result) {
-//	printEvent(result);
-//});
-//	perm.ProposeDeactivation("dc6b1096ca56b9f6d004b779ae3728bf83f8e22453404cc3cef16a3d9b96608bc67c4b30db88e0a5a6c6390213f7acbe1153ff6d23ce57380104288ae19373ef").then(function(result){
-//	printEvent(result);
-//});
-//	perm.DeactivateNode("dc6b1096ca56b9f6d004b779ae3728bf83f8e22453404cc3cef16a3d9b96608bc67c4b30db88e0a5a6c6390213f7acbe1153ff6d23ce57380104288ae19373ef").then(function(result){
-//	printEvent(result);
-//});
-//	perm.getNodeIndexForNode("dc6b1096ca56b9f6d004b779ae3728bf83f8e22453404cc3cef16a3d9b96608bc67c4b30db88e0a5a6c6390213f7acbe1153ff6d23ce57380104288ae19373ef").then(function(result){
-//	console.log(result);
-//});
+contract('Permissions', (accounts) => {
+  // 1. Permissions can only be initialized once
+  it('Permissions can only be initialized once', () => {
+    return Permissions.deployed().then(instance => {
+      permission = instance
+      return permission.isInitialized()
+    }).then(result => {
+      assert.equal(result, false, "Initialized flag should be false before initialized")
+      return permission.initialize(3, accounts.slice(0,3))
+    }).then(result => {
+      assertEventOfType(result, "ContractInitialized", 0)
+      return permission.isInitialized()
+    }).then(result => {
+      assert.equal(result, true, "Initialized flag should be true after initialized")
+    })
+  })
+  // 2. After initialization, number of nodes, number of accounts and number of voting accounts should be correct
+  it('After initialization, number of nodes, number of accounts and number of voting accounts should be correct', () => {
+    return Permissions.deployed().then(instance => {
+      permission = instance
+      return permission.getNumberOfAccounts()
+    }).then(result => {
+      assert.equal(result[0].toString(), 3, "account number should be 3 after intialization")
+      assert.equal(result[1].toString(), 3, "voting account number should be 3 after initialization")
+    })
+  })
+  // 3. After initialization, we should be able to get account address by index
+  it('After initialization, we should be able to get account address by index', () => {
+    return Permissions.deployed().then(instance => {
+      permission = instance
+      return permission.getAccountAddress(1)
+    }).then(result => {
+      assert.equal(result, "0xde47b2f33c9e74f5a9ff234e719f51f9f7d0bfe2", "account address should be equal to the first address in ganache")
+    })
+  })
+  // 4. Only full access account can propose node, new node will be in PendingApproval status
+  it('Only full access account can propose node, new node will be in PendingApproval status', () => {
+    return Permissions.deployed().then(instance => {
+      permission = instance
+      return permission.proposeNode("this", "is", "test", "node", false)
+    }).then(result => {
+      assertEventOfType(result, "NewNodeProposed", 0)
+      return permission.getNodeStatus("this")
+    }).then(result => {
+      assert.equal(result, 1, "PendingApproval status is 1")
+    })
+  })
+  // 5. Only full access account can approve node, new node vote status and vote count should be correct
+  it('Only full access account can approve node, new node vote status and vote count should be correct', () => {
+    return Permissions.deployed().then(instance => {
+      permission = instance
+      return permission.getVoteCount("this")
+    }).then(result => {
+      assert.equal(result, 0, "Vote count is 0 when approval submitted")
+      return permission.getVoteStatus("this", "0xDe47B2F33C9E74f5A9ff234E719f51f9F7D0bfe2")
+    }).then(result => {
+      assert.equal(result, false, "account 0 vote status should be false")
+      return permission.approveNode("this", {from: "0xDe47B2F33C9E74f5A9ff234E719f51f9F7D0bfe2"})
+    }).then(result => {
+      assertEventOfType(result, "VoteNodeApproval", 0)
+      return permission.getVoteStatus("this", "0xDe47B2F33C9E74f5A9ff234E719f51f9F7D0bfe2")
+    }).then(result => {
+      assert.equal(result, true, "account 0 vote status should be true")
+      return permission.getVoteStatus("this", "0x0eEd0932d51Aa5c94FAB1ABC839AbeaE59C5875A")
+    }).then(result => {
+      assert.equal(result, false, "account 1 vote status should be false")
+      return permission.approveNode("this", {from: "0x0eEd0932d51Aa5c94FAB1ABC839AbeaE59C5875A"})
+    }).then(result => {
+      assertEventOfType(result, "VoteNodeApproval", 0)
+      assertEventOfType(result, "NodeApproved", 1)
+      return permission.getVoteStatus("this", "0x0eEd0932d51Aa5c94FAB1ABC839AbeaE59C5875A")
+    }).then(result => {
+      assert.equal(result, true, "account 1 vote status should be true")
+    })
+  })
+})
