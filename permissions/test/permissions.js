@@ -67,16 +67,27 @@ contract('Permissions', (accounts) => {
       return permission.getVoteStatus("this", "0xDe47B2F33C9E74f5A9ff234E719f51f9F7D0bfe2")
     }).then(result => {
       assert.equal(result, true, "account 0 vote status should be true")
-      return permission.getVoteStatus("this", "0x0eEd0932d51Aa5c94FAB1ABC839AbeaE59C5875A")
+      return permission.getVoteCount("this")
     }).then(result => {
-      assert.equal(result, false, "account 1 vote status should be false")
+      assert.equal(result, 1, "Vote count is 1 after account 0 vote")
+    })
+  })
+  // 6. After half of the voting accounts vote, new node will be in Approved status
+  it('6. After half of the voting accounts vote, new node will be in Approved status', () => {
+    return Permissions.deployed().then(instance => {
+      permission = instance
       return permission.approveNode("this", {from: "0x0eEd0932d51Aa5c94FAB1ABC839AbeaE59C5875A"})
     }).then(result => {
       assertEventOfType(result, "VoteNodeApproval", 0)
       assertEventOfType(result, "NodeApproved", 1)
-      return permission.getVoteStatus("this", "0x0eEd0932d51Aa5c94FAB1ABC839AbeaE59C5875A")
-    }).then(result => {
-      assert.equal(result, true, "account 1 vote status should be true")
     })
   })
+  // 7. Only admin can add account and modify account access
+  // 8. Can get account access information based on account address
+  // 9. Anyone can propose node deactivation on existing node, node will be in PendingDeactivation status
+  // 10. Only full access account can approve deactivation. node vote status and vote count should be correct
+  // 11. After half of the voting accounts vote on deactivation, node will be in Deactivated status
+  // 12. Anyone can propose node blacklisting on existing node, node will be in PendingBlacklisting status
+  // 13. Only full access account can approve blacklisting. node vote status and vote count should be correct
+  // 14. After half of the voting accounts vote on blacklisting, node will be in blacklisted status
 })
