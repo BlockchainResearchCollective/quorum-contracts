@@ -1,6 +1,6 @@
-# quorum-contracts
+## quorum-contracts
 quorum precompiled contracts dev
 
-1. Use an array and a mapping to store account and node list. In this way, All accounts/nodes can be easily tracked
-2. The permission flag should pass in an admin account. That account address will be the only admin at set up added by constructor
-3. Use private variables to force security. People can only modify permission states by calling function.
+# Permissions
+P2P will come first before contract level access control. Therefore, we will have a static node list in Quorum which will contain all permanent node. The new nodes adding into the network will be written into another list and controlled by this contract.
+There is a one time function which will let user to add initial admin account list. The following account permission will controlled by this contract.
