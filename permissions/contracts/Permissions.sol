@@ -134,7 +134,7 @@ contract Permissions {
     public view
     returns (AccountAccess)
   {
-    if (accountAddressToIndex[_address] == 0){
+    if (accountAddressToIndex[_address] != 0){
       return accountList[accountAddressToIndex[_address]].accountAccess;
     } else {
       return AccountAccess.ReadOnly;
@@ -201,7 +201,7 @@ contract Permissions {
     nodeList.push(NodeDetails(_enodeId, _ipAddrPort,_discPort, _raftPort, _canLead, NodeStatus.PendingApproval));
     // add voting status, numberOfNodes is the index of current proposed node
     for (uint i = 1; i <= numberOfAccounts; i++){
-      voteStatus[i][accountList[i].accountAddress] = false;
+      voteStatus[numberOfNodes][accountList[i].accountAddress] = false;
     }
     voteCount[numberOfNodes] = 0;
     // emit event
@@ -213,7 +213,7 @@ contract Permissions {
     public
     mustInitialized
     onlyAdmin
-    {
+  {
       require(getNodeStatus(_enodeId) == NodeStatus.PendingApproval, "Node need to be in PendingApproval status");
       uint nodeIndex = nodeIdToIndex[keccak256(abi.encodePacked(_enodeId))];
       require(voteStatus[nodeIndex][msg.sender] == false, "Node can not double vote");
@@ -226,51 +226,100 @@ contract Permissions {
       checkNodeApproval(_enodeId);
   }
 
-  /* // Propose a node for deactivation from network
+  // Propose a node for deactivation from network
   function ProposeDeactivation(string _enodeId)
     public
-    initialized
-    onlyAdmin
+    mustInitialized
+    enodeInList(_enodeId)
   {
     require(getNodeStatus(_enodeId) == NodeStatus.Approved, "Node need to be in Approved status");
-    nodeList[keccak256(abi.encodePacked(_enodeId))].status = NodeStatus.PendingDeactivation;
+    uint nodeIndex = nodeIdToIndex[keccak256(abi.encodePacked(_enodeId))];
+    nodeList[nodeIndex].status = NodeStatus.PendingDeactivation;
+    // add voting status, numberOfNodes is the index of current proposed node
+    for (uint i = 1; i <= numberOfAccounts; i++){
+      voteStatus[nodeIndex][accountList[i].accountAddress] = false;
+    }
+    voteCount[nodeIndex] = 0;
+    // emit event
     emit NodePendingDeactivation(_enodeId);
   }
 
   //deactivates a given Enode and emits the decativation event
-  function DeactivateNode (string _enodeId) public {
+  function DeactivateNode (string _enodeId)
+    public
+    mustInitialized
+    onlyAdmin
+  {
     require(getNodeStatus(_enodeId) == NodeStatus.PendingDeactivation, "Node need to be in PendingDeactivation status");
-    bytes32 i;
-    i = keccak256(abi.encodePacked(_enodeId));
-    nodeList[i].status = NodeStatus.Deactivated;
-    emit NodeDeactivated(nodeList[i].enodeId, nodeList[i].ipAddrPort, nodeList[i].discPort, nodeList[i].raftPort);
+    uint nodeIndex = nodeIdToIndex[keccak256(abi.encodePacked(_enodeId))];
+    require(voteStatus[nodeIndex][msg.sender] == false, "Node can not double vote");
+    // vote node
+    voteStatus[nodeIndex][msg.sender] = true;
+    voteCount[nodeIndex]++;
+    // emit event
+    emit VoteNodeDeactivation(_enodeId, msg.sender);
+    // check if node vote reach majority
+    checkNodeDeactivation(_enodeId);
   }
 
   // Propose node for blacklisting
-  function ProposeNodeBlacklisting(string _enodeId, string _ipAddrPort, string _discPort, string _raftPort) public {
-    if (getNodeStatus(_enodeId) == NodeStatus.NotInList){
-      nodeList[keccak256(abi.encodePacked(_enodeId))] = nodeDetails(_enodeId, _ipAddrPort,_discPort, _raftPort,  false, false, NodeStatus.PendingBlacklisting);
+  function ProposeNodeBlacklisting(string _enodeId, string _ipAddrPort, string _discPort, string _raftPort)
+    public
+    mustInitialized
+  {
+    uint nodeIndex = nodeIdToIndex[keccak256(abi.encodePacked(_enodeId))];
+    // check if node is in the nodeList
+    if (nodeIndex != 0){
+      // no matter what status the node is in, vote will reset and node status change to PendingBlacklisting
+      nodeList[nodeIndex].status = NodeStatus.PendingBlacklisting;
+    } else {
+      // increment node number, add node to the list
+      numberOfNodes++;
+      nodeIdToIndex[keccak256(abi.encodePacked(_enodeId))] = numberOfNodes;
+      nodeIndex = numberOfNodes;
+      nodeList.push(NodeDetails(_enodeId, _ipAddrPort,_discPort, _raftPort, false, NodeStatus.PendingBlacklisting));
     }
-    else {
-      nodeList[keccak256(abi.encodePacked(_enodeId))].status = NodeStatus.PendingBlacklisting;
+    // add voting status, numberOfNodes is the index of current proposed node
+    for (uint i = 1; i <= numberOfAccounts; i++){
+      voteStatus[nodeIndex][accountList[i].accountAddress] = false;
     }
-    emit NodePendingBlacklisting (_enodeId);
+    voteCount[nodeIndex] = 0;
+    // emit event
+    emit NodePendingBlacklisting(_enodeId);
   }
 
   //Approve node blacklisting
-  function BlacklistNode (string _enodeId) public {
+  function BlacklistNode (string _enodeId)
+    public
+    mustInitialized
+    onlyAdmin
+  {
     require(getNodeStatus(_enodeId) == NodeStatus.PendingBlacklisting, "Node need to be in PendingBlacklisting status");
-    bytes32 i;
-    i = keccak256(abi.encodePacked(_enodeId));
-    nodeList[i].status = NodeStatus.Blacklisted;
-    emit NodeBlacklisted(nodeList[i].enodeId, nodeList[i].ipAddrPort, nodeList[i].discPort, nodeList[i].raftPort);
+    uint nodeIndex = nodeIdToIndex[keccak256(abi.encodePacked(_enodeId))];
+    require(voteStatus[nodeIndex][msg.sender] == false, "Node can not double vote");
+    // vote node
+    voteStatus[nodeIndex][msg.sender] = true;
+    voteCount[nodeIndex]++;
+    // emit event
+    emit VoteNodeBlacklisting(_enodeId, msg.sender);
+    // check if node vote reach majority
+    checkNodeBlacklisting(_enodeId);
   }
 
   // Checks if the Node is already added. If yes then returns true
-  function updateAcctAccess (address _acctId, AccountAccess access) public {
-    acctAccessList[_acctId] = acctAccess(_acctId, access);
-    emit AcctAccessModified(_acctId, access);
-  } */
+  function updateAccountAccess(address _address, AccountAccess _accountAccess)
+    external
+    mustInitialized
+    onlyAdmin
+    {
+      accountList.push(AccountDetails(_address, _accountAccess));
+      numberOfAccounts++;
+      accountAddressToIndex[_address] = numberOfAccounts;
+      if (_accountAccess == AccountAccess.FullAccess){
+        numberOfVotingAccounts++;
+      }
+      emit AccountAccessModified(_address, _accountAccess);
+  }
 
   /* private functions */
 
@@ -279,6 +328,22 @@ contract Permissions {
     if (voteCount[nodeIndex] > numberOfVotingAccounts / 2){
       nodeList[nodeIndex].status = NodeStatus.Approved;
       emit NodeApproved(nodeList[nodeIndex].enodeId, nodeList[nodeIndex].ipAddrPort, nodeList[nodeIndex].discPort, nodeList[nodeIndex].raftPort);
+    }
+  }
+
+  function checkNodeDeactivation(string _enodeId){
+    uint nodeIndex = nodeIdToIndex[keccak256(abi.encodePacked(_enodeId))];
+    if (voteCount[nodeIndex] > numberOfVotingAccounts / 2){
+      nodeList[nodeIndex].status = NodeStatus.Deactivated;
+      emit NodeDeactivated(nodeList[nodeIndex].enodeId, nodeList[nodeIndex].ipAddrPort, nodeList[nodeIndex].discPort, nodeList[nodeIndex].raftPort);
+    }
+  }
+
+  function checkNodeBlacklisting(string _enodeId){
+    uint nodeIndex = nodeIdToIndex[keccak256(abi.encodePacked(_enodeId))];
+    if (voteCount[nodeIndex] > numberOfVotingAccounts / 2){
+      nodeList[nodeIndex].status = NodeStatus.Blacklisted;
+      emit NodeBlacklisted(nodeList[nodeIndex].enodeId, nodeList[nodeIndex].ipAddrPort, nodeList[nodeIndex].discPort, nodeList[nodeIndex].raftPort);
     }
   }
 

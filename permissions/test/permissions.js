@@ -80,10 +80,35 @@ contract('Permissions', (accounts) => {
     }).then(result => {
       assertEventOfType(result, "VoteNodeApproval", 0)
       assertEventOfType(result, "NodeApproved", 1)
+      return permission.getNodeStatus("this")
+    }).then(result => {
+      assert.equal(result, 2, "Approved status is 2")
     })
   })
   // 7. Only admin can add account and modify account access
+  it('7. Only admin can add account and modify account access', () => {
+    return Permissions.deployed().then(instance => {
+      permission = instance
+      return permission.updateAccountAccess("0xa67c5bF82C557aF779A46f5EB26941196dd4e4a6", 2)
+    }).then(result => {
+      assertEventOfType(result, "AccountAccessModified", 0)
+      return permission.getAccountAccess("0xa67c5bF82C557aF779A46f5EB26941196dd4e4a6")
+    }).then(result => {
+      assert.equal(result, 2, "Transact Access is 0")
+    })
+  })
   // 8. Can get account access information based on account address
+  it('8. Can get account access information based on account address', () => {
+    return Permissions.deployed().then(instance => {
+      permission = instance
+      return permission.getAccountAccess("0xde47b2f33c9e74f5a9ff234e719f51f9f7d0bfe2")
+    }).then(result => {
+      assert.equal(result, 0, "FullAccess Access is 0")
+      return permission.getAccountAccess("0x757f97d96be005b0550dCEEC3881E0B0de390FB0")
+    }).then(result => {
+      assert.equal(result, 1, "ReadOnly Access is 1")
+    })
+  })
   // 9. Anyone can propose node deactivation on existing node, node will be in PendingDeactivation status
   // 10. Only full access account can approve deactivation. node vote status and vote count should be correct
   // 11. After half of the voting accounts vote on deactivation, node will be in Deactivated status
