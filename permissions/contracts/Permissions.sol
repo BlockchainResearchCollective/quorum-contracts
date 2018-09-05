@@ -245,7 +245,7 @@ contract Permissions {
   }
 
   //deactivates a given Enode and emits the decativation event
-  function DeactivateNode (string _enodeId)
+  function DeactivateNode(string _enodeId)
     public
     mustInitialized
     onlyAdmin
@@ -289,7 +289,7 @@ contract Permissions {
   }
 
   //Approve node blacklisting
-  function BlacklistNode (string _enodeId)
+  function BlacklistNode(string _enodeId)
     public
     mustInitialized
     onlyAdmin
@@ -323,7 +323,9 @@ contract Permissions {
 
   /* private functions */
 
-  function checkNodeApproval(string _enodeId){
+  function checkNodeApproval(string _enodeId)
+    internal
+  {
     uint nodeIndex = nodeIdToIndex[keccak256(abi.encodePacked(_enodeId))];
     if (voteCount[nodeIndex] > numberOfVotingAccounts / 2){
       nodeList[nodeIndex].status = NodeStatus.Approved;
@@ -331,7 +333,9 @@ contract Permissions {
     }
   }
 
-  function checkNodeDeactivation(string _enodeId){
+  function checkNodeDeactivation(string _enodeId)
+    internal
+  {
     uint nodeIndex = nodeIdToIndex[keccak256(abi.encodePacked(_enodeId))];
     if (voteCount[nodeIndex] > numberOfVotingAccounts / 2){
       nodeList[nodeIndex].status = NodeStatus.Deactivated;
@@ -339,7 +343,9 @@ contract Permissions {
     }
   }
 
-  function checkNodeBlacklisting(string _enodeId){
+  function checkNodeBlacklisting(string _enodeId)
+    internal
+  {
     uint nodeIndex = nodeIdToIndex[keccak256(abi.encodePacked(_enodeId))];
     if (voteCount[nodeIndex] > numberOfVotingAccounts / 2){
       nodeList[nodeIndex].status = NodeStatus.Blacklisted;
