@@ -181,7 +181,7 @@ contract('Permissions', (accounts) => {
     })
   })
   // 14. After half of the voting accounts vote on blacklisting, node will be in blacklisted status
-  it('11. After half of the voting accounts vote on deactivation, node will be in Deactivated status', () => {
+  it('14. After half of the voting accounts vote on blacklisting, node will be in blacklisted status', () => {
     return Permissions.deployed().then(instance => {
       permission = instance
       return permission.BlacklistNode("this", {from: accounts[1]})
