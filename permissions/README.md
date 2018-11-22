@@ -1,11 +1,8 @@
-# quorum-contracts
-quorum precompiled contracts dev
-
-## Permissions (outdated)
+### Permissions (old version)
 P2P will come first before contract level access control. Therefore, we will have a static node list in Quorum which will contain all permanent node. The new nodes adding into the network will be written into another list and controlled by this contract.
 There is a one time function which will let user to add initial admin account list. The subsequent account permission and node status change will be controlled by this contract.
 
-### Test Cases (outdated)
+### Test Cases (old version)
 1. Permissions can only be initialized once
 2. After initialization, number of nodes, number of accounts and number of voting accounts should be correct
 3. After initialization, we should be able to get account address by index
@@ -20,3 +17,5 @@ There is a one time function which will let user to add initial admin account li
 12. Anyone can propose node blacklisting on existing node, node will be in PendingBlacklisting status
 13. Only full access account can approve blacklisting. node vote status and vote count should be correct
 14. After half of the voting accounts vote on blacklisting, node will be in blacklisted status
+
+The final contract is going to be a part of permission enhancement release in Quorum
