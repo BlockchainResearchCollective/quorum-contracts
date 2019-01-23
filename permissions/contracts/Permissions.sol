@@ -34,6 +34,8 @@ contract Permissions {
   // if we want to list all account one day, mapping is not capable
   address[] private voterAcctList;
 
+  // store pre pending status, use for cancelPendingOperation
+  mapping(uint => NodeStatus) private prependingStatus;
   // store node approval, deactivation and blacklisting vote status (prevent double vote)
   mapping (uint => mapping (address => bool)) private voteStatus;
   // valid vote count
@@ -58,6 +60,9 @@ contract Permissions {
   event NodePendingBlacklist(string _enodeId);
   event NodeBlacklisted(string _enodeId, string _ipAddrPort, string _discPort, string _raftPort);
 
+  // pending operation cancelled
+  event PendingOperationCancelled(string _enodeId);
+
   // account permission events
   event AccountAccessModified(address _address, AccountAccess _access);
 
@@ -71,7 +76,7 @@ contract Permissions {
   // Checks if the given enode does not exists
   modifier enodeNotInList(string _enodeId)
   {
-    require(nodeIdToIndex[keccak256(abi.encodePacked(_enodeId))] == 0, "Enode is in the list");
+    require(nodeIdToIndex[keccak256(abi.encodePacked(_enodeId))] == 0 || getNodeStatus(_enodeId) == NodeStatus.NotInList, "Enode is in the list");
     _;
   }
 
@@ -194,10 +199,16 @@ contract Permissions {
     }
     else {
       if (checkVotingAccountExist()){
-        // increment node number, add node to the list
-        numberOfNodes++;
-        nodeIdToIndex[keccak256(abi.encodePacked(_enodeId))] = numberOfNodes;
-        nodeList.push(NodeDetails(_enodeId, _ipAddrPort,_discPort, _raftPort, NodeStatus.PendingApproval));
+        if (nodeIdToIndex[keccak256(abi.encodePacked(_enodeId))] != 0){
+          nodeList[getNodeIndex(_enodeId)].status = NodeStatus.PendingApproval;
+          prependingStatus[getNodeIndex(_enodeId)] = NodeStatus.NotInList;
+        } else {
+          // increment node number, add node to the list
+          numberOfNodes++;
+          nodeIdToIndex[keccak256(abi.encodePacked(_enodeId))] = numberOfNodes;
+          nodeList.push(NodeDetails(_enodeId, _ipAddrPort,_discPort, _raftPort, NodeStatus.PendingApproval));
+          prependingStatus[numberOfNodes] = NodeStatus.NotInList;
+        }
 
         // add voting status, numberOfNodes is the index of current proposed node
         initNodeVoteStatus(numberOfNodes);
@@ -229,6 +240,7 @@ contract Permissions {
     if (checkVotingAccountExist()){
       require(getNodeStatus(_enodeId) == NodeStatus.Approved, "Node need to be in Approved status");
       uint nodeIndex = getNodeIndex(_enodeId);
+      prependingStatus[nodeIndex] = NodeStatus.Approved;
       nodeList[nodeIndex].status = NodeStatus.PendingDeactivation;
       // add voting status, numberOfNodes is the index of current proposed node
       initNodeVoteStatus(nodeIndex);
@@ -259,6 +271,7 @@ contract Permissions {
     if (checkVotingAccountExist()){
       require(getNodeStatus(_enodeId) == NodeStatus.Deactivated, "Node need to be in Deactivated status");
       uint nodeIndex = getNodeIndex(_enodeId);
+      prependingStatus[nodeIndex] = NodeStatus.Deactivated;
       nodeList[nodeIndex].status = NodeStatus.PendingActivation;
       // add voting status, numberOfNodes is the index of current proposed node
       initNodeVoteStatus(nodeIndex);
@@ -291,6 +304,9 @@ contract Permissions {
       // check if node is in the nodeList
       if (nodeIdToIndex[keccak256(abi.encodePacked(_enodeId))] != 0){
         // no matter what status the node is in, vote will reset and node status change to PendingBlacklisting
+        if (!(nodeList[nodeIndex].status == NodeStatus.PendingApproval || nodeList[nodeIndex].status == NodeStatus.PendingActivation || nodeList[nodeIndex].status == NodeStatus.PendingDeactivation || nodeList[nodeIndex].status == NodeStatus.PendingBlacklisting)){
+          prependingStatus[nodeIndex] = nodeList[nodeIndex].status;
+        }
         nodeList[nodeIndex].status = NodeStatus.PendingBlacklisting;
         nodeIndex = getNodeIndex(_enodeId);
       } else {
@@ -298,6 +314,7 @@ contract Permissions {
         numberOfNodes++;
         nodeIdToIndex[keccak256(abi.encodePacked(_enodeId))] = numberOfNodes;
         nodeList.push(NodeDetails(_enodeId, _ipAddrPort,_discPort, _raftPort, NodeStatus.PendingBlacklisting));
+        prependingStatus[nodeIndex] = NodeStatus.NotInList;
         nodeIndex = numberOfNodes;
       }
       // add voting status, numberOfNodes is the index of current proposed node
@@ -324,8 +341,18 @@ contract Permissions {
     }
   }
 
-  function initAccounts() external
+  // Cancel current pending node operation
+  function cancelPendingOperation(string _enodeId) external canVote
   {
+    require(getNodeStatus(_enodeId) == NodeStatus.PendingApproval || getNodeStatus(_enodeId) == NodeStatus.PendingActivation || getNodeStatus(_enodeId) == NodeStatus.PendingDeactivation || getNodeStatus(_enodeId) == NodeStatus.PendingBlacklisting, "Node status must be in pending");
+    uint nodeIndex = getNodeIndex(_enodeId);
+    nodeList[nodeIndex].status = prependingStatus[nodeIndex];
+    emit PendingOperationCancelled(_enodeId);
+  }
+
+  function initAccounts(address account) external
+  {
+    initialAcctList.push(account);
     require(networkBoot == false, "network accounts already boot up");
     for (uint i=0; i<initialAcctList.length; i++){
       if (acctToIndex[initialAcctList[i]] == 0){

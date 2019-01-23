@@ -1,4 +1,4 @@
-var Permissions  = artifacts.require("./NewPermissions.sol");
+var Permissions  = artifacts.require("./Permissions.sol");
 
 module.exports = function(deployer) {
   deployer.deploy(Permissions);
